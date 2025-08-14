@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useMemo } from "react"
+import { useEffect, useState, useCallback, useMemo, startTransition } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -8,87 +8,117 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertTriangle, Package, RefreshCcw } from "lucide-react"
 
-type Tarifa = {
+type Ciudad = {
   id: number
-  origen: string | null
-  destino: string | null
-  pesoInicial: string
-  pesoFinal: string
-  tipoServicio: string
-  tipoBulto: string
-  tipoTarifa: string
-  lugarEntrega: string
-  valorTarifa: string
-  fechaDesde: string
-  fechaHasta: string
-  formaPago: string
-  estado: string
-  fechaCreacion: string
-  fechaActualizacion: string
+  ciudad_pullman: string
+  code_pullman: string
 }
+
+type Indexado = {
+  origenes: string[]
+  destinos: string[]
+  destinosByOrigen: Record<string, string[]>
+}
+
+
+
+type IndexadoCiudades = Indexado & { byName: Record<string, { id: number; code_pullman: string }> }
+function normalize(s: string) {
+  return s.normalize("NFKC").trim().toUpperCase()
+}
+
+function sortEs(arr: string[]) {
+  return arr.sort((a, b) => a.localeCompare(b, "es"))
+}
+
+type CiudadIndex = {
+  ciudades: string[]
+  byName: Record<string, { id: number; code_pullman: string }>
+  destinosByOrigen: Record<string, string[]>
+}
+
+/** Construye índices a partir de /api/ciudades */
+function buildIndexFromCiudades(data: Ciudad[]): IndexadoCiudades {
+  const ciudadesSet = new Set<string>()
+  const byName: Record<string, { id: number; code_pullman: string }> = {}
+
+  for (const c of data) {
+    const name = normalize(c.ciudad_pullman)
+    ciudadesSet.add(name)
+    byName[name] = { id: c.id, code_pullman: c.code_pullman }
+  }
+
+  const ciudades = sortEs(Array.from(ciudadesSet))
+
+  // Para mantener compatibilidad con el UI existente:
+  // - origenes y destinos son el mismo universo de ciudades
+  // - destinosByOrigen mapea cada origen a todas las ciudades (incluido el mismo)
+  const destinosByOrigen: Record<string, string[]> = {}
+  for (const o of ciudades) {
+    destinosByOrigen[o] = ciudades
+  }
+
+  return { origenes: ciudades, destinos: ciudades, destinosByOrigen, byName }
+}
+
+
+
+/* buildIndex(Tarifa) removed after migrating to /api/ciudades */
+
 
 export function QuoteForm() {
   // ---- Estados de formulario ----
-  const [dimensions, setDimensions] = useState({
-    height: "",
-    width: "",
-    length: "",
-    weight: "",
-  })
+  const [dimensions, setDimensions] = useState({ height: "", width: "", length: "", weight: "" })
   const [declaredValue, setDeclaredValue] = useState("")
   const [packaging, setPackaging] = useState("")
   const [heavyGoods, setHeavyGoods] = useState("")
   const [origin, setOrigin] = useState<string>("")
   const [destination, setDestination] = useState<string>("")
 
-  // ---- Tarifas (fetch al cargar) ----
-  const [tarifas, setTarifas] = useState<Tarifa[]>([])
-  const [loadingTarifas, setLoadingTarifas] = useState<boolean>(false)
-  const [tarifasError, setTarifasError] = useState<string | null>(null)
+  // ---- Datos e índices (precomputados) ----
+  const [ciudades, setCiudades] = useState<Ciudad[]>([])
+  const [indexado, setIndexado] = useState<IndexadoCiudades>({ origenes: [], destinos: [], destinosByOrigen: {}, byName: {} })
+  const [loadingCiudades, setLoadingCiudades] = useState<boolean>(false)
+  const [ciudadesError, setCiudadesError] = useState<string | null>(null)
 
-  const fetchTarifas = useCallback(async () => {
-    setLoadingTarifas(true)
-    setTarifasError(null)
+  const fetchCiudades = useCallback(async () => {
+    setLoadingCiudades(true)
+    setCiudadesError(null)
     try {
-      const res = await fetch("http://localhost:3000/api/tarifas", { cache: "no-store" })
+      const res = await fetch("/api/ciudades")
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const json = await res.json()
-      const data: Tarifa[] = Array.isArray(json) ? json : json?.data ?? []
-      setTarifas(data)
+      const data: Ciudad[] = Array.isArray(json) ? json : json?.data ?? []
+
+      // Preindexar fuera del render para que el picker abra sin jank
+      startTransition(() => {
+        setCiudades(data)
+        setIndexado(buildIndexFromCiudades(data))
+      })
     } catch (e: any) {
-      setTarifasError(e?.message ?? "Error al cargar tarifas")
+      setCiudadesError(e?.message ?? "Error al cargar ciudades")
     } finally {
-      setLoadingTarifas(false)
+      setLoadingCiudades(false)
     }
   }, [])
 
   useEffect(() => {
-    fetchTarifas()
-  }, [fetchTarifas])
+    fetchCiudades()
+  }, [fetchCiudades])
 
-  // ---- Utilidades para listas únicas ordenadas ----
-  const normalize = (s: string) => s.normalize("NFKC").trim().toUpperCase()
-  const uniqueSorted = (arr: (string | null | undefined)[]) =>
-    Array.from(
-      new Set(
-        arr
-          .map(v => (v ?? "").trim())
-          .filter(Boolean)
-          .map(v => normalize(v as string))
-      )
-    ).sort((a, b) => a.localeCompare(b, "es"))
+  // ---- Destinos en cascada por origen (sin recomputar pesado) ----
+  const destinosFiltrados = useMemo(() => {
+    if (!origin) return indexado.destinos
+    const o = normalize(origin)
+    return indexado.destinosByOrigen[o] ?? []
+  }, [origin, indexado])
 
-  // ---- Derivar opciones dinámicas ----
-  const origenes = useMemo(() => uniqueSorted(tarifas.map(t => t.origen)), [tarifas])
-  const destinos = useMemo(() => uniqueSorted(tarifas.map(t => t.destino)), [tarifas])
-
-  // Autoseleccionar si hay 1 sola opción (opcional)
+  // Si cambia el origen y el destino ya no es válido, limpiar destino
   useEffect(() => {
-    if (!origin && origenes.length === 1) setOrigin(origenes[0])
-  }, [origenes, origin])
-  useEffect(() => {
-    if (!destination && destinos.length === 1) setDestination(destinos[0])
-  }, [destinos, destination])
+    if (destination && !destinosFiltrados.includes(normalize(destination))) {
+      setDestination("")
+    }
+  }, [destinosFiltrados, destination])
 
   // ---- Handlers ----
   const handleInputChange = (field: keyof typeof dimensions, value: string) => {
@@ -97,13 +127,15 @@ export function QuoteForm() {
 
   const handleQuote = () => {
     console.log({
+      origin_meta: indexado?.byName?.[normalize(origin)] ?? null,
+      destination_meta: indexado?.byName?.[normalize(destination)] ?? null,
       origin,
       destination,
       dimensions,
       declaredValue,
       packaging,
       heavyGoods,
-      tarifasCount: tarifas.length,
+      ciudadesCount: ciudades.length,
     })
     // TODO: Implementar lógica real de cotización
   }
@@ -120,20 +152,26 @@ export function QuoteForm() {
         </p>
       </CardHeader>
 
-      <CardContent className="space-y-6">
-      {/* Origen y destino dinámicos */}
+      <CardContent className="space-y-6">       
+        {/* Origen y destino dinámicos (preindexados) */}
         <div className="grid md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="origin" className="text-sm font-medium text-gray-700">
               Origen
             </Label>
-            <Select value={origin} onValueChange={setOrigin} disabled={loadingTarifas || !!tarifasError}>
+            <Select
+              value={origin}
+              onValueChange={setOrigin}
+              disabled={loadingCiudades || !!ciudadesError || indexado.origenes.length === 0}
+            >
               <SelectTrigger className="border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]">
-                <SelectValue placeholder={loadingTarifas ? "Cargando..." : "Seleccione origen"} />
+                <SelectValue placeholder={loadingCiudades ? "Cargando..." : "Seleccione origen"} />
               </SelectTrigger>
               <SelectContent>
-                {origenes.length === 0 && <div className="px-3 py-2 text-sm text-gray-500">Sin datos</div>}
-                {origenes.map((o) => (
+                {indexado.origenes.length === 0 && (
+                  <div className="px-3 py-2 text-sm text-gray-500">Sin datos</div>
+                )}
+                {indexado.origenes.map((o) => (
                   <SelectItem key={o} value={o}>
                     {o}
                   </SelectItem>
@@ -146,13 +184,21 @@ export function QuoteForm() {
             <Label htmlFor="destination" className="text-sm font-medium text-gray-700">
               Destino
             </Label>
-            <Select value={destination} onValueChange={setDestination} disabled={loadingTarifas || !!tarifasError}>
+            <Select
+              value={destination}
+              onValueChange={setDestination}
+              disabled={loadingCiudades || !!ciudadesError || destinosFiltrados.length === 0}
+            >
               <SelectTrigger className="border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]">
-                <SelectValue placeholder={loadingTarifas ? "Cargando..." : "Seleccione destino"} />
+                <SelectValue placeholder={loadingCiudades ? "Cargando..." : "Seleccione destino"} />
               </SelectTrigger>
               <SelectContent>
-                {destinos.length === 0 && <div className="px-3 py-2 text-sm text-gray-500">Sin datos</div>}
-                {destinos.map((d) => (
+                {destinosFiltrados.length === 0 && (
+                  <div className="px-3 py-2 text-sm text-gray-500">
+                    {origin ? "No hay destinos para ese origen" : "Sin datos"}
+                  </div>
+                )}
+                {destinosFiltrados.map((d) => (
                   <SelectItem key={d} value={d}>
                     {d}
                   </SelectItem>
@@ -167,9 +213,7 @@ export function QuoteForm() {
           <h4 className="font-medium text-gray-800 mb-4">Dimensiones del paquete</h4>
           <div className="grid grid-cols-3 gap-3 mb-4">
             <div className="space-y-2">
-              <Label htmlFor="height" className="text-xs font-medium text-gray-600">
-                Alto
-              </Label>
+              <Label htmlFor="height" className="text-xs font-medium text-gray-600">Alto</Label>
               <div className="relative">
                 <Input
                   id="height"
@@ -179,16 +223,12 @@ export function QuoteForm() {
                   onChange={(e) => handleInputChange("height", e.target.value)}
                   className="pr-8 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">
-                  cm
-                </span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">cm</span>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="width" className="text-xs font-medium text-gray-600">
-                Largo
-              </Label>
+              <Label htmlFor="width" className="text-xs font-medium text-gray-600">Largo</Label>
               <div className="relative">
                 <Input
                   id="width"
@@ -198,16 +238,12 @@ export function QuoteForm() {
                   onChange={(e) => handleInputChange("width", e.target.value)}
                   className="pr-8 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">
-                  cm
-                </span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">cm</span>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="length" className="text-xs font-medium text-gray-600">
-                Ancho
-              </Label>
+              <Label htmlFor="length" className="text-xs font-medium text-gray-600">Ancho</Label>
               <div className="relative">
                 <Input
                   id="length"
@@ -217,18 +253,14 @@ export function QuoteForm() {
                   onChange={(e) => handleInputChange("length", e.target.value)}
                   className="pr-8 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">
-                  cm
-                </span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">cm</span>
               </div>
             </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="weight" className="text-sm font-medium text-gray-700">
-                Peso
-              </Label>
+              <Label htmlFor="weight" className="text-sm font-medium text-gray-700">Peso</Label>
               <div className="relative">
                 <Input
                   id="weight"
@@ -238,16 +270,12 @@ export function QuoteForm() {
                   onChange={(e) => handleInputChange("weight", e.target.value)}
                   className="pr-8 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">
-                  kg
-                </span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">kg</span>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="declaredValue" className="text-sm font-medium text-gray-700">
-                Valor declarado
-              </Label>
+              <Label htmlFor="declaredValue" className="text-sm font-medium text-gray-700">Valor declarado</Label>
               <div className="relative">
                 <Input
                   id="declaredValue"
@@ -257,9 +285,7 @@ export function QuoteForm() {
                   onChange={(e) => setDeclaredValue(e.target.value)}
                   className="pr-8 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">
-                  $
-                </span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">$</span>
               </div>
             </div>
           </div>
@@ -280,9 +306,6 @@ export function QuoteForm() {
         >
           Cotizar Envío
         </Button>
-
-        {/* Debug opcional */}
-        {/* <pre className="text-xs bg-gray-50 p-3 rounded border">{JSON.stringify({ origin, destination }, null, 2)}</pre> */}
       </CardContent>
     </Card>
   )
