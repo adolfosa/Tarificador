@@ -25,77 +25,131 @@ export function DimensionsInfo() {
         </div>
 
         {/* Package Illustration */}
-        <div className="bg-white p-8 rounded-lg border-2 border-dashed border-gray-300">
-          <div className="relative mx-auto w-48 h-32">
-            {/* 3D Box Illustration */}
-            <div className="absolute inset-0">
-              <svg viewBox="0 0 200 130" className="w-full h-full">
-                {/* Box faces */}
-                <path d="M20 40 L120 40 L140 20 L40 20 Z" fill="#f8f9fa" stroke="#003fa2" strokeWidth="2" />
-                <path d="M20 40 L20 100 L120 100 L120 40 Z" fill="#ffffff" stroke="#003fa2" strokeWidth="2" />
-                <path d="M120 40 L140 20 L140 80 L120 100 Z" fill="#e9ecef" stroke="#003fa2" strokeWidth="2" />
+        <div className="bg-white p-6 md:p-8 rounded-xl border border-gray-200 shadow-sm">
+          <div className="relative mx-auto w-80 h-56 sm:w-96 sm:h-64 md:w-[28rem] md:h-72">
+            <svg
+              viewBox="-10 0 205 160"
+              className="w-full h-full"
+              role="img"
+              aria-labelledby="box3dTitle box3dDesc"
+            >
+              <title id="box3dTitle">Dimensiones de una caja: Largo, Alto y Ancho</title>
+              <desc id="box3dDesc">
+                Ilustración isométrica de una caja con flechas para cada dimensión.
+              </desc>
 
-                {/* Dimension lines and labels */}
-                {/* Width */}
-                <line
-                  x1="25"
-                  y1="110"
-                  x2="115"
-                  y2="110"
-                  stroke="#ff5500cc"
-                  strokeWidth="2"
-                  markerEnd="url(#arrowhead)"
-                  markerStart="url(#arrowhead)"
-                />
-                <text x="70" y="125" textAnchor="middle" className="text-xs font-medium" fill="#ff5500cc">
-                  Largo
-                </text>
-
-                {/* Height */}
-                <line
-                  x1="10"
-                  y1="45"
-                  x2="10"
-                  y2="95"
-                  stroke="#ff5500cc"
-                  strokeWidth="2"
-                  markerEnd="url(#arrowhead)"
-                  markerStart="url(#arrowhead)"
-                />
-                <text
-                  x="5"
-                  y="75"
-                  textAnchor="middle"
-                  className="text-xs font-medium"
-                  fill="#ff5500cc"
-                  transform="rotate(-90 5 75)"
+              <defs>
+                {/* Flechas */}
+                <marker
+                  id="arrow"
+                  markerWidth="8"
+                  markerHeight="8"
+                  refX="7"
+                  refY="4"
+                  orient="auto"
+                  markerUnits="strokeWidth"
                 >
-                  Alto
-                </text>
+                  <polygon points="0 0, 8 4, 0 8" fill="#ff5500cc" />
+                </marker>
 
-                {/* Depth */}
+                {/* Sombra suave */}
+                <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" floodOpacity="0.20" />
+                </filter>
+              </defs>
+
+              {/* Caja */}
+              <g
+                filter="url(#shadow)"
+                stroke="#003fa2"
+                strokeWidth="2.25"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+              >
+                <path d="M28 48 L138 48 L158 28 L48 28 Z" fill="#f8fafc" />
+                <path d="M28 48 L28 120 L138 120 L138 48 Z" fill="#ffffff" />
+                <path d="M138 48 L158 28 L158 100 L138 120 Z" fill="#e5e7eb" />
+              </g>
+
+              {/* Largo */}
+              <g vectorEffect="non-scaling-stroke">
                 <line
-                  x1="125"
-                  y1="35"
-                  x2="145"
-                  y2="15"
+                  x1="33"
+                  y1="130"
+                  x2="133"
+                  y2="130"
                   stroke="#ff5500cc"
-                  strokeWidth="2"
-                  markerEnd="url(#arrowhead)"
-                  markerStart="url(#arrowhead)"
+                  strokeWidth="2.25"
+                  markerStart="url(#arrow)"
+                  markerEnd="url(#arrow)"
                 />
-                <text x="155" y="25" textAnchor="middle" className="text-xs font-medium" fill="#ff5500cc">
-                  Ancho
-                </text>
+                <g transform="translate(83,144)">
+                  <rect x="-28" y="-10" width="56" height="18" rx="4" fill="#ffffff" />
+                  <text
+                    x="0"
+                    y="3"
+                    textAnchor="middle"
+                    className="text-[11px] md:text-xs font-medium"
+                    fill="#ff5500cc"
+                  >
+                    Largo
+                  </text>
+                </g>
+              </g>
 
-                {/* Arrow markers */}
-                <defs>
-                  <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                    <polygon points="0 0, 10 3.5, 0 7" fill="#ff5500cc" />
-                  </marker>
-                </defs>
-              </svg>
-            </div>
+              {/* Alto */}
+              <g vectorEffect="non-scaling-stroke">
+                <line
+                  x1="18"
+                  y1="53"
+                  x2="18"
+                  y2="115"
+                  stroke="#ff5500cc"
+                  strokeWidth="2.25"
+                  markerStart="url(#arrow)"
+                  markerEnd="url(#arrow)"
+                />
+                <g transform="translate(6,84) rotate(-90)">
+                  <rect x="-24" y="-10" width="48" height="18" rx="4" fill="#ffffff00" />
+                  <text
+                    x="3"
+                    y="3"
+                    textAnchor="middle"
+                    className="text-[11px] md:text-xs font-medium"
+                    fill="#ff5500cc"
+                  >
+                    Alto
+                  </text>
+                </g>
+              </g>
+
+              {/* Ancho */}
+              <g vectorEffect="non-scaling-stroke">
+                <line
+                  x1="142"
+                  y1="42"
+                  x2="165"
+                  y2="21"
+                  stroke="#ff5500cc"
+                  strokeWidth="2.25"
+                  markerStart="url(#arrow)"
+                  markerEnd="url(#arrow)"
+                />
+                <g transform="translate(176,32)">
+                  <rect x="-30" y="-10" width="60" height="18" rx="4" fill="#ffffff00" />
+                  <text
+                    x="8"
+                    y="3"
+                    textAnchor="middle"
+                    className="text-[11px] md:text-xs font-medium"
+                    fill="#ff5500cc"
+                  >
+                    Ancho
+                  </text>
+                </g>
+              </g>
+            </svg>
           </div>
         </div>
 
