@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -8,10 +8,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertTriangle, Package, RefreshCcw } from "lucide-react"
 
-type Tarifa = any // <- tipa según tus columnas reales si quieres
+type Tarifa = {
+  id: number
+  origen: string | null
+  destino: string | null
+  pesoInicial: string
+  pesoFinal: string
+  tipoServicio: string
+  tipoBulto: string
+  tipoTarifa: string
+  lugarEntrega: string
+  valorTarifa: string
+  fechaDesde: string
+  fechaHasta: string
+  formaPago: string
+  estado: string
+  fechaCreacion: string
+  fechaActualizacion: string
+}
 
 export function QuoteForm() {
-  // ---- Estados de formulario (mantén los nombres como los tenías) ----
+  // ---- Estados de formulario ----
   const [dimensions, setDimensions] = useState({
     height: "",
     width: "",
@@ -24,7 +41,7 @@ export function QuoteForm() {
   const [origin, setOrigin] = useState<string>("")
   const [destination, setDestination] = useState<string>("")
 
-  // ---- Estados para tarifas (fetch al cargar la página) ----
+  // ---- Tarifas (fetch al cargar) ----
   const [tarifas, setTarifas] = useState<Tarifa[]>([])
   const [loadingTarifas, setLoadingTarifas] = useState<boolean>(false)
   const [tarifasError, setTarifasError] = useState<string | null>(null)
@@ -33,10 +50,11 @@ export function QuoteForm() {
     setLoadingTarifas(true)
     setTarifasError(null)
     try {
-      const res = await fetch("/api/tarifas", { cache: "no-store" })
+      const res = await fetch("http://localhost:3000/api/tarifas", { cache: "no-store" })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const json = await res.json()
-      setTarifas(Array.isArray(json) ? json : json?.data ?? [])
+      const data: Tarifa[] = Array.isArray(json) ? json : json?.data ?? []
+      setTarifas(data)
     } catch (e: any) {
       setTarifasError(e?.message ?? "Error al cargar tarifas")
     } finally {
@@ -45,17 +63,39 @@ export function QuoteForm() {
   }, [])
 
   useEffect(() => {
-    // 👉 carga automática al montar
     fetchTarifas()
   }, [fetchTarifas])
 
-  // ---- Handlers de formulario (mantén tu lógica) ----
+  // ---- Utilidades para listas únicas ordenadas ----
+  const normalize = (s: string) => s.normalize("NFKC").trim().toUpperCase()
+  const uniqueSorted = (arr: (string | null | undefined)[]) =>
+    Array.from(
+      new Set(
+        arr
+          .map(v => (v ?? "").trim())
+          .filter(Boolean)
+          .map(v => normalize(v as string))
+      )
+    ).sort((a, b) => a.localeCompare(b, "es"))
+
+  // ---- Derivar opciones dinámicas ----
+  const origenes = useMemo(() => uniqueSorted(tarifas.map(t => t.origen)), [tarifas])
+  const destinos = useMemo(() => uniqueSorted(tarifas.map(t => t.destino)), [tarifas])
+
+  // Autoseleccionar si hay 1 sola opción (opcional)
+  useEffect(() => {
+    if (!origin && origenes.length === 1) setOrigin(origenes[0])
+  }, [origenes, origin])
+  useEffect(() => {
+    if (!destination && destinos.length === 1) setDestination(destinos[0])
+  }, [destinos, destination])
+
+  // ---- Handlers ----
   const handleInputChange = (field: keyof typeof dimensions, value: string) => {
-    setDimensions((prev) => ({ ...prev, [field]: value }))
+    setDimensions(prev => ({ ...prev, [field]: value }))
   }
 
   const handleQuote = () => {
-    // aquí va tu lógica de cotización (usa dimensiones, declaredValue, packaging, heavyGoods, origin, destination, y si quieres tarifas)
     console.log({
       origin,
       destination,
@@ -65,11 +105,8 @@ export function QuoteForm() {
       heavyGoods,
       tarifasCount: tarifas.length,
     })
-    // TODO: implementar tu flujo real de cotización
+    // TODO: Implementar lógica real de cotización
   }
-
-  // (Opcional) derivar ciudades únicas desde tarifas si tu tabla las trae
-  // const ciudades = Array.from(new Set(tarifas.map(t => t.ciudad))).sort()
 
   return (
     <Card className="max-w-3xl mx-auto border-gray-200 shadow-md">
@@ -83,23 +120,24 @@ export function QuoteForm() {
         </p>
       </CardHeader>
 
-      <CardContent className="space-y-6">  
-      {/* Origen y destino */}
+      <CardContent className="space-y-6">
+      {/* Origen y destino dinámicos */}
         <div className="grid md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="origin" className="text-sm font-medium text-gray-700">
               Origen
             </Label>
-            <Select value={origin} onValueChange={setOrigin}>
+            <Select value={origin} onValueChange={setOrigin} disabled={loadingTarifas || !!tarifasError}>
               <SelectTrigger className="border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]">
-                <SelectValue placeholder="Seleccione origen" />
+                <SelectValue placeholder={loadingTarifas ? "Cargando..." : "Seleccione origen"} />
               </SelectTrigger>
               <SelectContent>
-                {/* Si luego quieres mapear desde tarifas, reemplaza estas opciones */}
-                <SelectItem value="santiago">Santiago</SelectItem>
-                <SelectItem value="valparaiso">Valparaíso</SelectItem>
-                <SelectItem value="concepcion">Concepción</SelectItem>
-                <SelectItem value="antofagasta">Antofagasta</SelectItem>
+                {origenes.length === 0 && <div className="px-3 py-2 text-sm text-gray-500">Sin datos</div>}
+                {origenes.map((o) => (
+                  <SelectItem key={o} value={o}>
+                    {o}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -108,16 +146,17 @@ export function QuoteForm() {
             <Label htmlFor="destination" className="text-sm font-medium text-gray-700">
               Destino
             </Label>
-            <Select value={destination} onValueChange={setDestination}>
+            <Select value={destination} onValueChange={setDestination} disabled={loadingTarifas || !!tarifasError}>
               <SelectTrigger className="border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]">
-                <SelectValue placeholder="Seleccione destino" />
+                <SelectValue placeholder={loadingTarifas ? "Cargando..." : "Seleccione destino"} />
               </SelectTrigger>
               <SelectContent>
-                {/* Idem, reemplaza por datos reales si viene desde tarifas */}
-                <SelectItem value="santiago">Santiago</SelectItem>
-                <SelectItem value="valparaiso">Valparaíso</SelectItem>
-                <SelectItem value="concepcion">Concepción</SelectItem>
-                <SelectItem value="antofagasta">Antofagasta</SelectItem>
+                {destinos.length === 0 && <div className="px-3 py-2 text-sm text-gray-500">Sin datos</div>}
+                {destinos.map((d) => (
+                  <SelectItem key={d} value={d}>
+                    {d}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -224,42 +263,7 @@ export function QuoteForm() {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Embalaje y carga */}
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="packaging" className="text-sm font-medium text-gray-700">
-              Embalaje
-            </Label>
-            <Select value={packaging} onValueChange={setPackaging}>
-              <SelectTrigger className="border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]">
-                <SelectValue placeholder="Seleccione tipo de embalaje" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="caja">Caja</SelectItem>
-                <SelectItem value="bolsa">Bolsa</SelectItem>
-                <SelectItem value="pallet">Pallet</SelectItem>
-                <SelectItem value="otro">Otro</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="heavyGoods" className="text-sm font-medium text-gray-700">
-              ¿Mercancía pesada?
-            </Label>
-            <Select value={heavyGoods} onValueChange={setHeavyGoods}>
-              <SelectTrigger className="border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]">
-                <SelectValue placeholder="Seleccione una opción" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="no">No</SelectItem>
-                <SelectItem value="si">Sí</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        </div>        
 
         {/* Info Alert */}
         <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
@@ -276,6 +280,9 @@ export function QuoteForm() {
         >
           Cotizar Envío
         </Button>
+
+        {/* Debug opcional */}
+        {/* <pre className="text-xs bg-gray-50 p-3 rounded border">{JSON.stringify({ origin, destination }, null, 2)}</pre> */}
       </CardContent>
     </Card>
   )
