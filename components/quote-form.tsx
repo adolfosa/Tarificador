@@ -74,6 +74,12 @@ export function QuoteForm() {
   const [heavyGoods, setHeavyGoods] = useState("")
   const [origin, setOrigin] = useState<string>("")
   const [destination, setDestination] = useState<string>("")
+  const [quoteLoading, setQuoteLoading] = useState(false)
+  const [quoteError, setQuoteError] = useState<string | null>(null)
+  const [quote, setQuote] = useState<null | {
+    match: { origen: string; destino: string; pesoSolicitado: number; bucketSeleccionado: number }
+    resultado: any
+  }>(null)
 
   // ---- Datos e índices (precomputados) ----
   const [ciudades, setCiudades] = useState<Ciudad[]>([])
@@ -125,19 +131,44 @@ export function QuoteForm() {
     setDimensions(prev => ({ ...prev, [field]: value }))
   }
 
-  const handleQuote = () => {
-    console.log({
-      origin_meta: indexado?.byName?.[normalize(origin)] ?? null,
-      destination_meta: indexado?.byName?.[normalize(destination)] ?? null,
-      origin,
-      destination,
-      dimensions,
-      declaredValue,
-      packaging,
-      heavyGoods,
-      ciudadesCount: ciudades.length,
-    })
-    // TODO: Implementar lógica real de cotización
+  const handleQuote = async () => {
+    setQuoteError(null)
+    setQuote(null)
+
+    // Validaciones básicas
+    if (!origin || !destination) {
+      setQuoteError("Debes seleccionar origen y destino.")
+      return
+    }
+    const peso = Number(dimensions.weight)
+    if (!Number.isFinite(peso) || peso <= 0) {
+      setQuoteError("Debes ingresar un peso válido (> 0).")
+      return
+    }
+
+    try {
+      setQuoteLoading(true)
+      const res = await fetch("/api/tarifas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          origen: origin,
+          destino: destination,
+          peso
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        setQuoteError(data?.error || `Error HTTP ${res.status}`)
+        return
+      }
+      setQuote(data)
+    } catch (e: any) {
+      setQuoteError(e?.message ?? "Error de red al consultar la tarifa")
+    } finally {
+      setQuoteLoading(false)
+    }
   }
 
   return (
@@ -302,10 +333,56 @@ export function QuoteForm() {
         {/* Botón de cotizar */}
         <Button
           onClick={handleQuote}
-          className="w-full bg-[#ff5500cc] hover:bg-[#ff5500] text-white font-medium transition-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl"
+          disabled={quoteLoading || !origin || !destination || !dimensions.weight}
+          className="w-full bg-[#ff5500cc] hover:bg-[#ff5500] text-white font-medium transition-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl disabled:opacity-60"
         >
-          Cotizar Envío
+          {quoteLoading ? "Cotizando..." : "Cotizar Envío"}
         </Button>
+        {quoteError && (
+          <div className="mt-3 p-3 rounded border border-red-200 bg-red-50 text-sm text-red-700">
+            {quoteError}
+          </div>
+        )}
+        {quote && (
+        <div className="mt-4 p-4 rounded-lg border border-gray-200 bg-gray-50">
+          <h5 className="font-semibold text-gray-800 mb-2">Cotización</h5>
+          <div className="grid sm:grid-cols-2 gap-3 text-sm">
+            <div>
+              <div className="text-gray-500">Origen → Destino</div>
+              <div className="font-medium">{quote.match.origen} → {quote.match.destino}</div>
+            </div>
+            <div>
+              <div className="text-gray-500">Peso solicitado / Bucket</div>
+              <div className="font-medium">
+                {quote.match.pesoSolicitado} kg → {quote.match.bucketSeleccionado} kg
+              </div>
+            </div>
+            <div>
+              <div className="text-gray-500">Tarifa </div>
+              <div className="text-lg font-bold">
+                {Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" })
+                  .format(Number(quote.resultado.tarifa_pullman_nueva))}
+              </div>
+            </div>
+            <div>
+              <div className="text-gray-500">Servicio / Entrega</div>
+              <div className="font-medium">
+                {quote.resultado.tipo_servicio} · {quote.resultado.tipo_entrega}
+              </div>
+            </div>
+            <div>
+              <div className="text-gray-500">Nombre tarifa</div>
+              <div className="font-medium">{quote.resultado.nombre_tarifa}</div>
+            </div>
+            <div>
+              <div className="text-gray-500">Fecha compromiso</div>
+              <div className="font-medium">
+                {new Date(quote.resultado.fecha_compromiso).toLocaleString("es-CL")}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       </CardContent>
     </Card>
   )
