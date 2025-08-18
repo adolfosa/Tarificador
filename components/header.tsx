@@ -35,7 +35,7 @@ export function Header() {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <div className="flex items-center">
-              <div className="text-2xl font-bold text-[#003fa2]">pullman</div>
+              <div className="text-2xl font-bold text-[#003fa2]">Pullman</div>
             </div>
 
             {/* Navigation */}

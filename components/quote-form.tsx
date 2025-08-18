@@ -7,14 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { AlertTriangle, Package as PackageIcon, RefreshCcw, Loader2 } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { ChevronsUpDown, Check } from "lucide-react"
@@ -367,11 +359,11 @@ export function QuoteForm({
               </Label>
               <SearchableSelect
                 triggerId="origin"
-                value={origen}                 // <-- antes: origin
+                value={origen}                
                 onChange={setOrigen}
-                options={opcionesCiudades}     // <-- antes: indexado.origenes
+                options={opcionesCiudades}     
                 placeholder={loadingCiudades ? "Cargando..." : "Seleccione origen"}
-                disabled={loadingCiudades || !!ciudadesError || opcionesCiudades.length === 0}  // <-- usa opcionesCiudades
+                disabled={loadingCiudades || !!ciudadesError || opcionesCiudades.length === 0} 
               />
             </div>
 
@@ -387,7 +379,7 @@ export function QuoteForm({
                 placeholder={
                   loadingCiudades
                     ? "Cargando..."
-                    : (!origen ? "Seleccione origen primero" : "Seleccione destino") // <-- aquí era !origin
+                    : (!origen ? "Seleccione origen primero" : "Seleccione destino")
                 }
                 disabled={loadingCiudades || !!ciudadesError || destinosFiltrados.length === 0}
               />
