@@ -19,6 +19,12 @@ import {
   RefreshCcw,
 } from "lucide-react";
 
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
+import { ChevronsUpDown, Check } from "lucide-react"
+import { cn } from "@/lib/utils" // si ya usas utilitario de clases; si no, quita cn()
+
+
 /* ===================== Tipos comunes (coinciden con QuoteResult) ===================== */
 export type QuoteMatch = {
   origen: string;
@@ -115,6 +121,77 @@ function normalizeToQuoteData(
   }
 
   throw new Error("Respuesta de cotización inválida o vacía.");
+}
+
+function SearchableSelect({
+  value,
+  onChange,
+  options,
+  placeholder = "Selecciona…",
+  disabled = false,
+  triggerId,
+}: {
+  value: string
+  onChange: (val: string) => void
+  options: string[]
+  placeholder?: string
+  disabled?: boolean
+  triggerId?: string
+}) {
+  const [open, setOpen] = React.useState(false)
+
+  const selected = value || ""
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          id={triggerId}
+          type="button"
+          disabled={disabled}
+          className={cn(
+            "w-full inline-flex items-center justify-between rounded-md border bg-white px-3 py-2 text-sm",
+            "border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#ff5500cc]/50 focus:border-[#ff5500cc]",
+            "disabled:opacity-60 disabled:cursor-not-allowed"
+          )}
+        >
+          <span className={cn("truncate", !selected && "text-gray-500")}>
+            {selected || placeholder}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 opacity-60" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Buscar…" />
+          <CommandList>
+            <CommandEmpty>Sin coincidencias</CommandEmpty>
+            <CommandGroup>
+              {options.map((opt) => (
+                <CommandItem
+                  key={opt}
+                  value={opt}
+                  onSelect={() => {
+                    onChange(opt)
+                    setOpen(false)
+                  }}
+                  className="cursor-pointer"
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      selected === opt ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  <span className="truncate">{opt}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
 }
 
 /* ===================== Componente ===================== */
@@ -287,49 +364,37 @@ export function QuoteForm({
       <CardContent className="space-y-6">
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Origen / Destino */}
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            {/* Origen */}
             <div className="space-y-2">
-              <Label htmlFor="origen">Origen</Label>
-              <Select value={origen} onValueChange={setOrigen}>
-                <SelectTrigger id="origen">
-                  <SelectValue
-                    placeholder={
-                      loadingCiudades ? "Cargando…" : "Selecciona origen"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {opcionesCiudades.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="origin" className="text-sm font-medium text-gray-700">
+                Origen
+              </Label>
+              <SearchableSelect
+                triggerId="origin"
+                value={origen}                 // <-- antes: origin
+                onChange={setOrigen}
+                options={opcionesCiudades}     // <-- antes: indexado.origenes
+                placeholder={loadingCiudades ? "Cargando..." : "Seleccione origen"}
+                disabled={loadingCiudades || !!ciudadesError || opcionesCiudades.length === 0}  // <-- usa opcionesCiudades
+              />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="destino">Destino</Label>
-              <Select
+              <Label htmlFor="destination" className="text-sm font-medium text-gray-700">
+                Destino
+              </Label>
+              <SearchableSelect
+                triggerId="destination"
                 value={destino}
-                onValueChange={setDestino}
-                disabled={!origen || loadingCiudades || !!ciudadesError}
-              >
-                <SelectTrigger id="destino">
-                  <SelectValue
-                    placeholder={
-                      !origen ? "Selecciona origen primero" : "Selecciona destino"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {destinosFiltrados.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={setDestino}
+                options={destinosFiltrados}
+                placeholder={
+                  loadingCiudades ? "Cargando..." :
+                  !origin ? "Seleccione origen primero" : "Seleccione destino"
+                }
+                disabled={loadingCiudades || !!ciudadesError || destinosFiltrados.length === 0}
+              />
             </div>
           </div>
 
