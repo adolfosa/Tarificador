@@ -79,12 +79,6 @@ export function QuoteResult({ quote }: { quote: QuoteData | null }) {
             <div className="text-gray-500">Nombre tarifa</div>
             <div className="font-medium">{quote.resultado.nombre_tarifa}</div>
           </div>
-          <div className="sm:col-span-2">
-            <div className="text-gray-500">Fecha compromiso</div>
-            <div className="font-medium">
-              {new Date(quote.resultado.fecha_compromiso).toLocaleString("es-CL")}
-            </div>
-          </div>
         </div>
       </CardContent>
     </Card>
