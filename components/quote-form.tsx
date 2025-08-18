@@ -136,6 +136,7 @@ export function QuoteForm({
   const [largo, setLargo] = useState<string>("");
   const [ancho, setAncho] = useState<string>("");
   const [alto, setAlto] = useState<string>("");
+  const [declaredValue, setDeclaredValue] = useState<string>("");
 
   /* estado de envío */
   const [loading, setLoading] = useState(false);
@@ -206,6 +207,15 @@ export function QuoteForm({
       return;
     }
 
+    // permite vacío o >= 0
+    const declaredValNum =
+      declaredValue.trim() === "" ? null : Number(declaredValue);
+
+    if (declaredValNum !== null && (!Number.isFinite(declaredValNum) || declaredValNum < 0)) {
+      setError("El valor declarado debe ser un número mayor o igual a 0.");
+      return;
+    }
+
     // Bucket seleccionado: por ahora usamos el mismo peso declarado
     const bucket = pesoNum;
 
@@ -218,6 +228,7 @@ export function QuoteForm({
           origen: origenVal,
           destino: destinoVal,
           peso: pesoNum,
+          valor_declarado: declaredValNum ?? undefined,
         }),
         cache: "no-store",
       });
@@ -257,6 +268,7 @@ export function QuoteForm({
     setAlto("");
     setError(null);
     setLocalQuote(null);
+    setDeclaredValue("");
   }
 
   /* ===================== Render ===================== */
@@ -265,32 +277,14 @@ export function QuoteForm({
       <CardHeader className="pb-4">
         <CardTitle className="text-2xl font-bold text-[#003fa2] flex items-center gap-2">
           <PackageIcon className="h-6 w-6 text-[#ff5500cc]" />
-          Cotizador
-        </CardTitle>
-        <div className="h-1 w-16 bg-[#ff5500cc] rounded-full"></div>
+          Cotiza tu envío
+        </CardTitle>     
+        <p className="text-sm text-gray-600">
+          Selecciona origen/destino e ingresa medidas exactas, peso y valor declarado para obtener tu cotización.
+        </p>
       </CardHeader>
 
       <CardContent className="space-y-6">
-        {/* Estado de ciudades */}
-        <div className="flex items-center justify-between gap-3 text-sm">
-          {loadingCiudades ? (
-            <span className="text-gray-500">Cargando ciudades…</span>
-          ) : ciudadesError ? (
-            <span className="inline-flex items-center gap-2 text-red-600">
-              <AlertTriangle className="h-4 w-4" />
-              {ciudadesError}
-            </span>
-          ) : (
-            <span className="text-gray-500">
-              {ciudades.length} ciudades disponibles
-            </span>
-          )}
-          <Button variant="secondary" size="sm" onClick={fetchCiudades}>
-            <RefreshCcw className="h-4 w-4 mr-1" />
-            Actualizar
-          </Button>
-        </div>
-
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Origen / Destino */}
           <div className="grid sm:grid-cols-2 gap-4">
@@ -339,64 +333,124 @@ export function QuoteForm({
             </div>
           </div>
 
-          {/* Medidas (opcionales) + Peso */}
-          <div className="grid md:grid-cols-4 gap-4">
+          {/* Medidas (cm), Peso (kg) y Valor declarado ($) */}
+          <div className="grid md:grid-cols-5 gap-4">
+            {/* Largo */}
             <div className="space-y-2">
-              <Label htmlFor="largo">Largo (cm)</Label>
-              <Input
-                id="largo"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                placeholder="0"
-                value={largo}
-                onChange={(e) => setLargo(e.target.value)}
-              />
+              <Label htmlFor="largo" className="text-sm font-medium text-gray-700">
+                Largo
+              </Label>
+              <div className="relative">
+                <Input
+                  id="largo"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  placeholder="0"
+                  value={largo}
+                  onChange={(e) => setLargo(e.target.value)}
+                  className="pr-12 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">
+                  cm
+                </span>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="ancho">Ancho (cm)</Label>
-              <Input
-                id="ancho"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                placeholder="0"
-                value={ancho}
-                onChange={(e) => setAncho(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="alto">Alto (cm)</Label>
-              <Input
-                id="alto"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                placeholder="0"
-                value={alto}
-                onChange={(e) => setAlto(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="peso">Peso (kg)</Label>
-              <Input
-                id="peso"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                placeholder="0"
-                value={peso}
-                onChange={(e) => setPeso(e.target.value)}
-                required
-              />
-            </div>
-          </div>
 
-          {/* Hint volumétrico */}
-          <div className="text-xs text-gray-500">
-            Peso volumétrico estimado:{" "}
-            {volumetrico ? `${volumetrico.toFixed(2)} kg` : "—"} (L×A×H ÷ 5000)
+            {/* Ancho */}
+            <div className="space-y-2">
+              <Label htmlFor="ancho" className="text-sm font-medium text-gray-700">
+                Ancho
+              </Label>
+              <div className="relative">
+                <Input
+                  id="ancho"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  placeholder="0"
+                  value={ancho}
+                  onChange={(e) => setAncho(e.target.value)}
+                  className="pr-12 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">
+                  cm
+                </span>
+              </div>
+            </div>
+
+            {/* Alto */}
+            <div className="space-y-2">
+              <Label htmlFor="alto" className="text-sm font-medium text-gray-700">
+                Alto
+              </Label>
+              <div className="relative">
+                <Input
+                  id="alto"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  placeholder="0"
+                  value={alto}
+                  onChange={(e) => setAlto(e.target.value)}
+                  className="pr-12 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">
+                  cm
+                </span>
+              </div>
+            </div>
+
+            {/* Peso */}
+            <div className="space-y-2">
+              <Label htmlFor="peso" className="text-sm font-medium text-gray-700">
+                Peso
+              </Label>
+              <div className="relative">
+                <Input
+                  id="peso"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  placeholder="0"
+                  value={peso}
+                  onChange={(e) => setPeso(e.target.value)}
+                  className="pr-12 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">
+                  kg
+                </span>
+              </div>
+            </div>
+
+            {/* Valor declarado */}
+            <div className="space-y-2">
+              <Label htmlFor="declaredValue" className="text-sm font-medium text-gray-700">
+                Valor declarado
+              </Label>
+              <div className="relative">
+                <Input
+                  id="declaredValue"
+                  type="number"
+                  placeholder="0"
+                  value={declaredValue}
+                  onChange={(e) => setDeclaredValue(e.target.value)}
+                  className="pr-12 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">
+                  $
+                </span>
+              </div>
+            </div>
           </div>
+      
+          {/* Info Alert */}
+          <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-amber-800">
+              <strong>100 cm = 1 metro</strong> — Ingresa medidas correctas para una cotización precisa.
+            </p>
+          </div>          
 
           {/* Errores */}
           {error && (

@@ -30,8 +30,7 @@ export function QuoteResult({ quote }: { quote: QuoteData | null }) {
           <CardTitle className="text-2xl font-bold text-[#003fa2] flex items-center gap-2">
             <Receipt className="h-6 w-6 text-[#ff5500cc]" />
             Resultado de la cotización
-          </CardTitle>
-          <div className="h-1 w-16 bg-[#ff5500cc] rounded-full"></div>
+          </CardTitle>          
         </CardHeader>
         <CardContent>
           <p className="text-gray-600">
@@ -51,7 +50,6 @@ export function QuoteResult({ quote }: { quote: QuoteData | null }) {
           <Receipt className="h-6 w-6 text-[#ff5500cc]" />
           Resultado de la cotización
         </CardTitle>
-        <div className="h-1 w-16 bg-[#ff5500cc] rounded-full"></div>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid sm:grid-cols-2 gap-4 text-sm">
