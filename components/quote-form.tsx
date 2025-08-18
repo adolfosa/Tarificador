@@ -334,112 +334,118 @@ export function QuoteForm({
           </div>
 
           {/* Medidas (cm), Peso (kg) y Valor declarado ($) */}
-          <div className="grid md:grid-cols-5 gap-4">
-            {/* Largo */}
-            <div className="space-y-2">
-              <Label htmlFor="largo" className="text-sm font-medium text-gray-700">
-                Largo
-              </Label>
-              <div className="relative">
-                <Input
-                  id="largo"
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  placeholder="0"
-                  value={largo}
-                  onChange={(e) => setLargo(e.target.value)}
-                  className="pr-12 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">
-                  cm
-                </span>
+          <div className="space-y-4">
+            {/* Fila 1: Largo / Ancho / Alto */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Largo */}
+              <div className="space-y-2">
+                <Label htmlFor="largo" className="text-sm font-medium text-gray-700">
+                  Largo
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="largo"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    placeholder="0"
+                    value={largo}
+                    onChange={(e) => setLargo(e.target.value)}
+                    className="pr-12 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">
+                    cm
+                  </span>
+                </div>
+              </div>
+
+              {/* Ancho */}
+              <div className="space-y-2">
+                <Label htmlFor="ancho" className="text-sm font-medium text-gray-700">
+                  Ancho
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="ancho"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    placeholder="0"
+                    value={ancho}
+                    onChange={(e) => setAncho(e.target.value)}
+                    className="pr-12 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">
+                    cm
+                  </span>
+                </div>
+              </div>
+
+              {/* Alto */}
+              <div className="space-y-2">
+                <Label htmlFor="alto" className="text-sm font-medium text-gray-700">
+                  Alto
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="alto"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    placeholder="0"
+                    value={alto}
+                    onChange={(e) => setAlto(e.target.value)}
+                    className="pr-12 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">
+                    cm
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Ancho */}
-            <div className="space-y-2">
-              <Label htmlFor="ancho" className="text-sm font-medium text-gray-700">
-                Ancho
-              </Label>
-              <div className="relative">
-                <Input
-                  id="ancho"
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  placeholder="0"
-                  value={ancho}
-                  onChange={(e) => setAncho(e.target.value)}
-                  className="pr-12 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">
-                  cm
-                </span>
+            {/* Fila 2: Peso / Valor declarado */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Peso */}
+              <div className="space-y-2">
+                <Label htmlFor="peso" className="text-sm font-medium text-gray-700">
+                  Peso
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="peso"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    placeholder="0"
+                    value={peso}
+                    onChange={(e) => setPeso(e.target.value)}
+                    className="pr-12 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">
+                    kg
+                  </span>
+                </div>
               </div>
-            </div>
 
-            {/* Alto */}
-            <div className="space-y-2">
-              <Label htmlFor="alto" className="text-sm font-medium text-gray-700">
-                Alto
-              </Label>
-              <div className="relative">
-                <Input
-                  id="alto"
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  placeholder="0"
-                  value={alto}
-                  onChange={(e) => setAlto(e.target.value)}
-                  className="pr-12 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">
-                  cm
-                </span>
-              </div>
-            </div>
-
-            {/* Peso */}
-            <div className="space-y-2">
-              <Label htmlFor="peso" className="text-sm font-medium text-gray-700">
-                Peso
-              </Label>
-              <div className="relative">
-                <Input
-                  id="peso"
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  placeholder="0"
-                  value={peso}
-                  onChange={(e) => setPeso(e.target.value)}
-                  className="pr-12 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">
-                  kg
-                </span>
-              </div>
-            </div>
-
-            {/* Valor declarado */}
-            <div className="space-y-2">
-              <Label htmlFor="declaredValue" className="text-sm font-medium text-gray-700">
-                Valor declarado
-              </Label>
-              <div className="relative">
-                <Input
-                  id="declaredValue"
-                  type="number"
-                  placeholder="0"
-                  value={declaredValue}
-                  onChange={(e) => setDeclaredValue(e.target.value)}
-                  className="pr-12 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">
-                  $
-                </span>
+              {/* Valor declarado */}
+              <div className="space-y-2">
+                <Label htmlFor="declaredValue" className="text-sm font-medium text-gray-700">
+                  Valor declarado
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="declaredValue"
+                    type="number"
+                    placeholder="0"
+                    value={declaredValue}
+                    onChange={(e) => setDeclaredValue(e.target.value)}
+                    className="pr-12 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">
+                    $
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -463,7 +469,7 @@ export function QuoteForm({
           <div className="flex items-center gap-3">
             <Button
               type="submit"
-              className="bg-[#003fa2] hover:bg-[#00328a] text-white"
+              className="bg-[#ff5500cc] hover:bg-[#ff5500] text-white"
               disabled={loading || loadingCiudades || !!ciudadesError}
             >
               {loading ? "Cotizando…" : "Cotizar"}
