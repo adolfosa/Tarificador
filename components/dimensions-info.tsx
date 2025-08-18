@@ -9,7 +9,6 @@ export function DimensionsInfo() {
           <Ruler className="h-6 w-6 text-[#ff5500cc]" />
           Dimensiones de tu envío
         </CardTitle>
-        <div className="h-1 w-16 bg-[#ff5500cc] rounded-full"></div>
       </CardHeader>
 
       <CardContent className="space-y-6">
