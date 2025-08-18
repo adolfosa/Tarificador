@@ -25,7 +25,7 @@ export function DimensionsInfo() {
 
         {/* Package Illustration */}
         <div className="bg-white p-6 md:p-8 rounded-xl border border-gray-200 shadow-sm">
-          <div className="relative mx-auto w-80 h-56 sm:w-96 sm:h-64 md:w-[28rem] md:h-72">
+          <div className="relative mx-auto w-64 h-44 sm:w-80 sm:h-52 md:w-[22rem] md:h-55">
             <svg
               viewBox="-10 0 205 160"
               className="w-full h-full"
