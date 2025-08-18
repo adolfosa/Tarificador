@@ -1,389 +1,455 @@
-"use client"
+"use client";
 
-import { useEffect, useState, useCallback, useMemo, startTransition } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { AlertTriangle, Package, RefreshCcw } from "lucide-react"
+import * as React from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertTriangle,
+  Package as PackageIcon,
+  RefreshCcw,
+} from "lucide-react";
 
+/* ===================== Tipos comunes (coinciden con QuoteResult) ===================== */
+export type QuoteMatch = {
+  origen: string;
+  destino: string;
+  pesoSolicitado: number;
+  bucketSeleccionado: number;
+};
+
+export type QuoteResultado = {
+  tarifa_pullman_nueva: string | number;
+  tipo_servicio: string;
+  tipo_entrega: string;
+  nombre_tarifa: string;
+  fecha_compromiso: string;
+  [k: string]: any;
+};
+
+export type QuoteData = {
+  match: QuoteMatch;
+  resultado: QuoteResultado;
+};
+
+/* ===================== Tipos locales ===================== */
 type Ciudad = {
-  id: number
-  ciudad_pullman: string
-  code_pullman: string
+  id: number;
+  ciudad_pullman: string;
+  code_pullman: string;
+};
+
+type ApiRow = {
+  origen: string;
+  destino: string;
+  peso_final?: string | number;
+  peso_cotizar?: string | number;
+  tarifa_pullman_nueva: string | number;
+  tipo_servicio: string;
+  tipo_entrega: string;
+  nombre_tarifa: string;
+  fecha_compromiso: string;
+  [k: string]: any;
+};
+
+/* ===================== Helpers ===================== */
+const toCLP = (n: number) =>
+  Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(n);
+
+function parsePositiveFloat(s: string): number | null {
+  const n = Number(s);
+  if (Number.isFinite(n) && n > 0) return n;
+  return null;
 }
 
-type Indexado = {
-  origenes: string[]
-  destinos: string[]
-  destinosByOrigen: Record<string, string[]>
-}
-
-
-
-type IndexadoCiudades = Indexado & { byName: Record<string, { id: number; code_pullman: string }> }
-function normalize(s: string) {
-  return s.normalize("NFKC").trim().toUpperCase()
-}
-
-function sortEs(arr: string[]) {
-  return arr.sort((a, b) => a.localeCompare(b, "es"))
-}
-
-type CiudadIndex = {
-  ciudades: string[]
-  byName: Record<string, { id: number; code_pullman: string }>
-  destinosByOrigen: Record<string, string[]>
-}
-
-/** Construye índices a partir de /api/ciudades */
-function buildIndexFromCiudades(data: Ciudad[]): IndexadoCiudades {
-  const ciudadesSet = new Set<string>()
-  const byName: Record<string, { id: number; code_pullman: string }> = {}
-
-  for (const c of data) {
-    const name = normalize(c.ciudad_pullman)
-    ciudadesSet.add(name)
-    byName[name] = { id: c.id, code_pullman: c.code_pullman }
+function normalizeToQuoteData(
+  payload: any,
+  submitted: { origen: string; destino: string; peso: number; bucket: number }
+): QuoteData {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "match" in payload &&
+    "resultado" in payload
+  ) {
+    return payload as QuoteData;
   }
 
-  const ciudades = sortEs(Array.from(ciudadesSet))
+  if (Array.isArray(payload) && payload.length > 0) {
+    const row: ApiRow = payload[0];
 
-  // Para mantener compatibilidad con el UI existente:
-  // - origenes y destinos son el mismo universo de ciudades
-  // - destinosByOrigen mapea cada origen a todas las ciudades (incluido el mismo)
-  const destinosByOrigen: Record<string, string[]> = {}
-  for (const o of ciudades) {
-    destinosByOrigen[o] = ciudades
+    const {
+      tarifa_pullman_nueva,
+      tipo_servicio,
+      tipo_entrega,
+      nombre_tarifa,
+      fecha_compromiso,
+      ...rest
+    } = row;
+
+    return {
+      match: {
+        origen: submitted.origen,
+        destino: submitted.destino,
+        pesoSolicitado: submitted.peso,
+        bucketSeleccionado: submitted.bucket,
+      },
+      resultado: {
+        ...rest,
+        tarifa_pullman_nueva,
+        tipo_servicio,
+        tipo_entrega,
+        nombre_tarifa,
+        fecha_compromiso,
+      },
+    };
   }
 
-  return { origenes: ciudades, destinos: ciudades, destinosByOrigen, byName }
+  throw new Error("Respuesta de cotización inválida o vacía.");
 }
 
+/* ===================== Componente ===================== */
+export function QuoteForm({
+  onQuote,
+}: {
+  /** Si se pasa, enviamos el resultado al padre y NO renderizamos el resultado inline */
+  onQuote?: (q: QuoteData) => void;
+}) {
+  /* ciudades */
+  const [ciudades, setCiudades] = useState<Ciudad[]>([]);
+  const [loadingCiudades, setLoadingCiudades] = useState(false);
+  const [ciudadesError, setCiudadesError] = useState<string | null>(null);
 
+  /* formulario */
+  const [origen, setOrigen] = useState<string>("");
+  const [destino, setDestino] = useState<string>("");
+  const [peso, setPeso] = useState<string>("");
+  const [largo, setLargo] = useState<string>("");
+  const [ancho, setAncho] = useState<string>("");
+  const [alto, setAlto] = useState<string>("");
 
-/* buildIndex(Tarifa) removed after migrating to /api/ciudades */
+  /* estado de envío */
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  /* fallback (solo si NO hay onQuote) */
+  const [localQuote, setLocalQuote] = useState<QuoteData | null>(null);
 
-export function QuoteForm() {
-  // ---- Estados de formulario ----
-  const [dimensions, setDimensions] = useState({ height: "", width: "", length: "", weight: "" })
-  const [declaredValue, setDeclaredValue] = useState("")
-  const [packaging, setPackaging] = useState("")
-  const [heavyGoods, setHeavyGoods] = useState("")
-  const [origin, setOrigin] = useState<string>("")
-  const [destination, setDestination] = useState<string>("")
-  const [quoteLoading, setQuoteLoading] = useState(false)
-  const [quoteError, setQuoteError] = useState<string | null>(null)
-  const [quote, setQuote] = useState<null | {
-    match: { origen: string; destino: string; pesoSolicitado: number; bucketSeleccionado: number }
-    resultado: any
-  }>(null)
-
-  // ---- Datos e índices (precomputados) ----
-  const [ciudades, setCiudades] = useState<Ciudad[]>([])
-  const [indexado, setIndexado] = useState<IndexadoCiudades>({ origenes: [], destinos: [], destinosByOrigen: {}, byName: {} })
-  const [loadingCiudades, setLoadingCiudades] = useState<boolean>(false)
-  const [ciudadesError, setCiudadesError] = useState<string | null>(null)
-
-  const fetchCiudades = useCallback(async () => {
-    setLoadingCiudades(true)
-    setCiudadesError(null)
+  /* ===================== Cargar ciudades ===================== */
+  async function fetchCiudades() {
+    setLoadingCiudades(true);
+    setCiudadesError(null);
     try {
-      const res = await fetch("/api/ciudades")
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json = await res.json()
-      const data: Ciudad[] = Array.isArray(json) ? json : json?.data ?? []
-
-      // Preindexar fuera del render para que el picker abra sin jank
-      startTransition(() => {
-        setCiudades(data)
-        setIndexado(buildIndexFromCiudades(data))
-      })
+      const res = await fetch("/api/ciudades", { cache: "no-store" });
+      if (!res.ok) throw new Error(`Error ${res.status} al cargar ciudades`);
+      const data = (await res.json()) as Ciudad[];
+      setCiudades(data);
     } catch (e: any) {
-      setCiudadesError(e?.message ?? "Error al cargar ciudades")
+      setCiudadesError(e?.message ?? "Error al cargar ciudades");
     } finally {
-      setLoadingCiudades(false)
+      setLoadingCiudades(false);
     }
-  }, [])
-
-  useEffect(() => {
-    fetchCiudades()
-  }, [fetchCiudades])
-
-  // ---- Destinos en cascada por origen (sin recomputar pesado) ----
-  const destinosFiltrados = useMemo(() => {
-    if (!origin) return indexado.destinos
-    const o = normalize(origin)
-    return indexado.destinosByOrigen[o] ?? []
-  }, [origin, indexado])
-
-  // Si cambia el origen y el destino ya no es válido, limpiar destino
-  useEffect(() => {
-    if (destination && !destinosFiltrados.includes(normalize(destination))) {
-      setDestination("")
-    }
-  }, [destinosFiltrados, destination])
-
-  // ---- Handlers ----
-  const handleInputChange = (field: keyof typeof dimensions, value: string) => {
-    setDimensions(prev => ({ ...prev, [field]: value }))
   }
 
-  const handleQuote = async () => {
-    setQuoteError(null)
-    setQuote(null)
+  useEffect(() => {
+    fetchCiudades();
+  }, []);
 
-    // Validaciones básicas
-    if (!origin || !destination) {
-      setQuoteError("Debes seleccionar origen y destino.")
-      return
+  /* ===================== Derivados ===================== */
+  const opcionesCiudades = useMemo(
+    () =>
+      ciudades
+        .map((c) => c.ciudad_pullman)
+        .sort((a, b) => a.localeCompare(b)),
+    [ciudades]
+  );
+
+  const destinosFiltrados = useMemo(() => {
+    if (!origen) return opcionesCiudades;
+    // Evita permitir el mismo destino que el origen
+    return opcionesCiudades.filter((c) => c !== origen);
+  }, [origen, opcionesCiudades]);
+
+  // Cálculo informativo de peso volumétrico (L×A×H ÷ 5000)
+  const volumetrico = useMemo(() => {
+    const L = parsePositiveFloat(largo) ?? 0;
+    const A = parsePositiveFloat(ancho) ?? 0;
+    const H = parsePositiveFloat(alto) ?? 0;
+    if (L && A && H) return (L * A * H) / 5000;
+    return 0;
+  }, [largo, ancho, alto]);
+
+  /* ===================== Submit ===================== */
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    const origenVal = origen.trim().toUpperCase();
+    const destinoVal = destino.trim().toUpperCase();
+    const pesoNum = parsePositiveFloat(peso);
+
+    if (!origenVal || !destinoVal) {
+      setError("Debes indicar origen y destino.");
+      return;
     }
-    const peso = Number(dimensions.weight)
-    if (!Number.isFinite(peso) || peso <= 0) {
-      setQuoteError("Debes ingresar un peso válido (> 0).")
-      return
+    if (!pesoNum) {
+      setError("El peso debe ser un número mayor a 0.");
+      return;
     }
 
+    // Bucket seleccionado: por ahora usamos el mismo peso declarado
+    const bucket = pesoNum;
+
+    setLoading(true);
     try {
-      setQuoteLoading(true)
       const res = await fetch("/api/tarifas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          origen: origin,
-          destino: destination,
-          peso
+          origen: origenVal,
+          destino: destinoVal,
+          peso: pesoNum,
         }),
-      })
-
-      const data = await res.json()
+        cache: "no-store",
+      });
       if (!res.ok) {
-        setQuoteError(data?.error || `Error HTTP ${res.status}`)
-        return
+        const maybe = await res.json().catch(() => null);
+        throw new Error(
+          maybe?.error || maybe?.message || `Error al cotizar: ${res.status}`
+        );
       }
-      setQuote(data)
-    } catch (e: any) {
-      setQuoteError(e?.message ?? "Error de red al consultar la tarifa")
+      const data = await res.json();
+
+      const quote = normalizeToQuoteData(data, {
+        origen: origenVal,
+        destino: destinoVal,
+        peso: pesoNum,
+        bucket,
+      });
+
+      if (onQuote) {
+        onQuote(quote);
+      } else {
+        setLocalQuote(quote);
+      }
+    } catch (err: any) {
+      setError(err?.message || "Error inesperado al cotizar.");
     } finally {
-      setQuoteLoading(false)
+      setLoading(false);
     }
   }
 
+  function resetForm() {
+    setOrigen("");
+    setDestino("");
+    setPeso("");
+    setLargo("");
+    setAncho("");
+    setAlto("");
+    setError(null);
+    setLocalQuote(null);
+  }
+
+  /* ===================== Render ===================== */
   return (
-    <Card className="max-w-3xl mx-auto border-gray-200 shadow-md">
-      <CardHeader className="space-y-1">
-        <div className="flex items-center gap-2">
-          <Package className="h-6 w-6 text-[#ff5500]" />
-          <CardTitle className="text-2xl font-bold text-[#003fa3]">Cotiza tu Envío</CardTitle>
-        </div>
-        <p className="text-sm text-gray-600">
-          Selecciona origen/destino e ingresa medidas exactas, peso y valor declarado para obtener tu cotización.
-        </p>
+    <Card className="w-full shadow-lg border-0 bg-gradient-to-br from-white to-gray-50">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-2xl font-bold text-[#003fa2] flex items-center gap-2">
+          <PackageIcon className="h-6 w-6 text-[#ff5500cc]" />
+          Cotizador
+        </CardTitle>
+        <div className="h-1 w-16 bg-[#ff5500cc] rounded-full"></div>
       </CardHeader>
 
-      <CardContent className="space-y-6">       
-        {/* Origen y destino dinámicos (preindexados) */}
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="origin" className="text-sm font-medium text-gray-700">
-              Origen
-            </Label>
-            <Select
-              value={origin}
-              onValueChange={setOrigin}
-              disabled={loadingCiudades || !!ciudadesError || indexado.origenes.length === 0}
-            >
-              <SelectTrigger className="border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]">
-                <SelectValue placeholder={loadingCiudades ? "Cargando..." : "Seleccione origen"} />
-              </SelectTrigger>
-              <SelectContent>
-                {indexado.origenes.length === 0 && (
-                  <div className="px-3 py-2 text-sm text-gray-500">Sin datos</div>
-                )}
-                {indexado.origenes.map((o) => (
-                  <SelectItem key={o} value={o}>
-                    {o}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="destination" className="text-sm font-medium text-gray-700">
-              Destino
-            </Label>
-            <Select
-              value={destination}
-              onValueChange={setDestination}
-              disabled={loadingCiudades || !!ciudadesError || destinosFiltrados.length === 0}
-            >
-              <SelectTrigger className="border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]">
-                <SelectValue placeholder={loadingCiudades ? "Cargando..." : "Seleccione destino"} />
-              </SelectTrigger>
-              <SelectContent>
-                {destinosFiltrados.length === 0 && (
-                  <div className="px-3 py-2 text-sm text-gray-500">
-                    {origin ? "No hay destinos para ese origen" : "Sin datos"}
-                  </div>
-                )}
-                {destinosFiltrados.map((d) => (
-                  <SelectItem key={d} value={d}>
-                    {d}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+      <CardContent className="space-y-6">
+        {/* Estado de ciudades */}
+        <div className="flex items-center justify-between gap-3 text-sm">
+          {loadingCiudades ? (
+            <span className="text-gray-500">Cargando ciudades…</span>
+          ) : ciudadesError ? (
+            <span className="inline-flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-4 w-4" />
+              {ciudadesError}
+            </span>
+          ) : (
+            <span className="text-gray-500">
+              {ciudades.length} ciudades disponibles
+            </span>
+          )}
+          <Button variant="secondary" size="sm" onClick={fetchCiudades}>
+            <RefreshCcw className="h-4 w-4 mr-1" />
+            Actualizar
+          </Button>
         </div>
 
-        {/* Dimensiones */}
-        <div>
-          <h4 className="font-medium text-gray-800 mb-4">Dimensiones del paquete</h4>
-          <div className="grid grid-cols-3 gap-3 mb-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Origen / Destino */}
+          <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="height" className="text-xs font-medium text-gray-600">Alto</Label>
-              <div className="relative">
-                <Input
-                  id="height"
-                  type="number"
-                  placeholder="0"
-                  value={dimensions.height}
-                  onChange={(e) => handleInputChange("height", e.target.value)}
-                  className="pr-8 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">cm</span>
-              </div>
+              <Label htmlFor="origen">Origen</Label>
+              <Select value={origen} onValueChange={setOrigen}>
+                <SelectTrigger id="origen">
+                  <SelectValue
+                    placeholder={
+                      loadingCiudades ? "Cargando…" : "Selecciona origen"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {opcionesCiudades.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="width" className="text-xs font-medium text-gray-600">Largo</Label>
-              <div className="relative">
-                <Input
-                  id="width"
-                  type="number"
-                  placeholder="0"
-                  value={dimensions.width}
-                  onChange={(e) => handleInputChange("width", e.target.value)}
-                  className="pr-8 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">cm</span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="length" className="text-xs font-medium text-gray-600">Ancho</Label>
-              <div className="relative">
-                <Input
-                  id="length"
-                  type="number"
-                  placeholder="0"
-                  value={dimensions.length}
-                  onChange={(e) => handleInputChange("length", e.target.value)}
-                  className="pr-8 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">cm</span>
-              </div>
+              <Label htmlFor="destino">Destino</Label>
+              <Select
+                value={destino}
+                onValueChange={setDestino}
+                disabled={!origen || loadingCiudades || !!ciudadesError}
+              >
+                <SelectTrigger id="destino">
+                  <SelectValue
+                    placeholder={
+                      !origen ? "Selecciona origen primero" : "Selecciona destino"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {destinosFiltrados.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-4">
+          {/* Medidas (opcionales) + Peso */}
+          <div className="grid md:grid-cols-4 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="weight" className="text-sm font-medium text-gray-700">Peso</Label>
-              <div className="relative">
-                <Input
-                  id="weight"
-                  type="number"
-                  placeholder="0"
-                  value={dimensions.weight}
-                  onChange={(e) => handleInputChange("weight", e.target.value)}
-                  className="pr-8 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">kg</span>
-              </div>
+              <Label htmlFor="largo">Largo (cm)</Label>
+              <Input
+                id="largo"
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                placeholder="0"
+                value={largo}
+                onChange={(e) => setLargo(e.target.value)}
+              />
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="declaredValue" className="text-sm font-medium text-gray-700">Valor declarado</Label>
-              <div className="relative">
-                <Input
-                  id="declaredValue"
-                  type="number"
-                  placeholder="0"
-                  value={declaredValue}
-                  onChange={(e) => setDeclaredValue(e.target.value)}
-                  className="pr-8 border-gray-300 focus:border-[#ff5500cc] focus:ring-[#ff5500cc]"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 bg-gray-100 px-1 rounded">$</span>
-              </div>
+              <Label htmlFor="ancho">Ancho (cm)</Label>
+              <Input
+                id="ancho"
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                placeholder="0"
+                value={ancho}
+                onChange={(e) => setAncho(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="alto">Alto (cm)</Label>
+              <Input
+                id="alto"
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                placeholder="0"
+                value={alto}
+                onChange={(e) => setAlto(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="peso">Peso (kg)</Label>
+              <Input
+                id="peso"
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                placeholder="0"
+                value={peso}
+                onChange={(e) => setPeso(e.target.value)}
+                required
+              />
             </div>
           </div>
-        </div>        
 
-        {/* Info Alert */}
-        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-          <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-          <p className="text-sm text-amber-800">
-            <strong>100 cm = 1 metro</strong> — Ingresa medidas correctas para una cotización precisa.
-          </p>
-        </div>
+          {/* Hint volumétrico */}
+          <div className="text-xs text-gray-500">
+            Peso volumétrico estimado:{" "}
+            {volumetrico ? `${volumetrico.toFixed(2)} kg` : "—"} (L×A×H ÷ 5000)
+          </div>
 
-        {/* Botón de cotizar */}
-        <Button
-          onClick={handleQuote}
-          disabled={quoteLoading || !origin || !destination || !dimensions.weight}
-          className="w-full bg-[#ff5500cc] hover:bg-[#ff5500] text-white font-medium transition-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl disabled:opacity-60"
-        >
-          {quoteLoading ? "Cotizando..." : "Cotizar Envío"}
-        </Button>
-        {quoteError && (
-          <div className="mt-3 p-3 rounded border border-red-200 bg-red-50 text-sm text-red-700">
-            {quoteError}
+          {/* Errores */}
+          {error && (
+            <p className="text-sm text-red-600 border border-red-200 bg-red-50 rounded-md px-3 py-2">
+              {error}
+            </p>
+          )}
+
+          {/* Acciones */}
+          <div className="flex items-center gap-3">
+            <Button
+              type="submit"
+              className="bg-[#003fa2] hover:bg-[#00328a] text-white"
+              disabled={loading || loadingCiudades || !!ciudadesError}
+            >
+              {loading ? "Cotizando…" : "Cotizar"}
+            </Button>
+            <Button type="button" variant="secondary" onClick={resetForm}>
+              Limpiar
+            </Button>
+          </div>
+        </form>
+
+        {/* Fallback resultado inline (solo si NO hay onQuote) */}
+        {!onQuote && localQuote && (
+          <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+            <div className="text-sm text-gray-500 mb-1">
+              Resultado (inline, sin onQuote)
+            </div>
+            <div className="grid sm:grid-cols-2 gap-2 text-sm">
+              <div>
+                <div className="text-gray-500">Ruta</div>
+                <div className="font-medium">
+                  {localQuote.match.origen} → {localQuote.match.destino}
+                </div>
+              </div>
+              <div>
+                <div className="text-gray-500">Peso / Bucket</div>
+                <div className="font-medium">
+                  {localQuote.match.pesoSolicitado} kg →{" "}
+                  {localQuote.match.bucketSeleccionado} kg
+                </div>
+              </div>
+              <div className="sm:col-span-2">
+                <div className="text-gray-500">Tarifa</div>
+                <div className="text-base font-bold">
+                  {toCLP(Number(localQuote.resultado.tarifa_pullman_nueva))}
+                </div>
+              </div>
+            </div>
           </div>
         )}
-        {quote && (
-        <div className="mt-4 p-4 rounded-lg border border-gray-200 bg-gray-50">
-          <h5 className="font-semibold text-gray-800 mb-2">Cotización</h5>
-          <div className="grid sm:grid-cols-2 gap-3 text-sm">
-            <div>
-              <div className="text-gray-500">Origen → Destino</div>
-              <div className="font-medium">{quote.match.origen} → {quote.match.destino}</div>
-            </div>
-            <div>
-              <div className="text-gray-500">Peso solicitado / Bucket</div>
-              <div className="font-medium">
-                {quote.match.pesoSolicitado} kg → {quote.match.bucketSeleccionado} kg
-              </div>
-            </div>
-            <div>
-              <div className="text-gray-500">Tarifa </div>
-              <div className="text-lg font-bold">
-                {Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" })
-                  .format(Number(quote.resultado.tarifa_pullman_nueva))}
-              </div>
-            </div>
-            <div>
-              <div className="text-gray-500">Servicio / Entrega</div>
-              <div className="font-medium">
-                {quote.resultado.tipo_servicio} · {quote.resultado.tipo_entrega}
-              </div>
-            </div>
-            <div>
-              <div className="text-gray-500">Nombre tarifa</div>
-              <div className="font-medium">{quote.resultado.nombre_tarifa}</div>
-            </div>
-            <div>
-              <div className="text-gray-500">Fecha compromiso</div>
-              <div className="font-medium">
-                {new Date(quote.resultado.fecha_compromiso).toLocaleString("es-CL")}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
       </CardContent>
     </Card>
-  )
+  );
 }
