@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { AlertTriangle, Package as PackageIcon, RefreshCcw, Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -13,17 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  AlertTriangle,
-  Package as PackageIcon,
-  RefreshCcw,
-} from "lucide-react";
 
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { ChevronsUpDown, Check } from "lucide-react"
-import { cn } from "@/lib/utils" // si ya usas utilitario de clases; si no, quita cn()
-
+import { cn } from "@/lib/utils"
 
 /* ===================== Tipos comunes (coinciden con QuoteResult) ===================== */
 export type QuoteMatch = {
@@ -350,7 +345,7 @@ export function QuoteForm({
 
   /* ===================== Render ===================== */
   return (
-    <Card className="w-full shadow-lg border-0 bg-gradient-to-br from-white to-gray-50">
+    <Card className="relative w-full shadow-lg border-0 bg-gradient-to-br from-white to-gray-50">
       <CardHeader className="pb-4">
         <CardTitle className="text-2xl font-bold text-[#003fa2] flex items-center gap-2">
           <PackageIcon className="h-6 w-6 text-[#ff5500cc]" />
@@ -390,8 +385,9 @@ export function QuoteForm({
                 onChange={setDestino}
                 options={destinosFiltrados}
                 placeholder={
-                  loadingCiudades ? "Cargando..." :
-                  !origin ? "Seleccione origen primero" : "Seleccione destino"
+                  loadingCiudades
+                    ? "Cargando..."
+                    : (!origen ? "Seleccione origen primero" : "Seleccione destino") // <-- aquí era !origin
                 }
                 disabled={loadingCiudades || !!ciudadesError || destinosFiltrados.length === 0}
               />
@@ -537,10 +533,14 @@ export function QuoteForm({
               className="bg-[#ff5500cc] hover:bg-[#ff5500] text-white"
               disabled={loading || loadingCiudades || !!ciudadesError}
             >
-              {loading ? "Cotizando…" : "Cotizar"}
-            </Button>
-            <Button type="button" variant="secondary" onClick={resetForm}>
-              Limpiar
+              {loading ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Cotizando…
+                </span>
+              ) : (
+                "Cotizar"
+              )}
             </Button>
           </div>
         </form>
@@ -575,6 +575,14 @@ export function QuoteForm({
           </div>
         )}
       </CardContent>
+      {loading && (
+        <div className="absolute inset-0 z-20 grid place-items-center bg-white/60 backdrop-blur-[1px]">
+          <div className="flex items-center gap-2 text-[#003fa2]">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span className="font-medium">Cotizando…</span>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
